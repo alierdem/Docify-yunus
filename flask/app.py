@@ -1,9 +1,11 @@
 import os
-from flask import Flask, request, render_template, jsonify
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 from azure.ai.formrecognizer import DocumentAnalysisClient
 from azure.core.credentials import AzureKeyCredential
 
 app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
 
 # Azure Form Recognizer settings
 endpoint = "https://docunalyze-1.cognitiveservices.azure.com/"
@@ -14,11 +16,7 @@ UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
-@app.route('/', methods=['GET'])
-def index():
-    return render_template('index.html')
-
-@app.route('/upload', methods=['POST'])
+@app.route('/api/upload', methods=['POST'])
 def upload_file():
     if 'file' not in request.files:
         return jsonify({'error': 'No file part'}), 400
@@ -29,8 +27,7 @@ def upload_file():
         filename = os.path.join(UPLOAD_FOLDER, file.filename)
         file.save(filename)
         result = analyze_invoice(filename)
-        return jsonify(result), 200, {'Content-Type': 'application/json'}
-
+        return jsonify(result), 200
 
 def analyze_invoice(file_path):
     client = DocumentAnalysisClient(endpoint, AzureKeyCredential(key))
@@ -46,7 +43,6 @@ def analyze_invoice(file_path):
         return invoice_data
     else:
         return {'error': 'No invoice found in the document'}
-
 
 if __name__ == '__main__':
     app.run(debug=True)
