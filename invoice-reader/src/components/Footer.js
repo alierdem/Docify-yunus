@@ -5,7 +5,7 @@ function Footer() {
   return (
     <Box sx={{ bgcolor: 'background.paper', p: 6 }} component="footer">
       <Typography variant="body2" color="text.secondary" align="center">
-        © 2024 Invoice Analyzer. All rights reserved.
+        © 2024 Invoice Analyzer by Cebren Finance. All rights reserved.
       </Typography>
     </Box>
   );
