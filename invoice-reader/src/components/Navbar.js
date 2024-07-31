@@ -18,6 +18,9 @@ function Navbar() {
         <Button color="inherit" component={RouterLink} to="/about">
           About
         </Button>
+        <Button color="inherit" component={RouterLink} to="/privacy-policy">
+          Privacy Policy
+        </Button>
         {isAuthenticated ? (
           <Button color="inherit" onClick={logout}>
             Logout

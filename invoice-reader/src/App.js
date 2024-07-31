@@ -28,6 +28,8 @@ function App() {
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/about" element={<About />} />
+              <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+
               <Route
                 path="/"
                 element={
@@ -36,7 +38,6 @@ function App() {
                   </ProtectedRoute>
                 }
               />
-              <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             </Routes>
             <Footer />
           </div>
