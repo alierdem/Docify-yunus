@@ -1,16 +1,20 @@
 import React, { useState, useCallback } from 'react';
 import axios from 'axios';
-import { Container, Typography, Button, Box, Paper, CircularProgress, IconButton } from '@mui/material';
+import { Container, Typography, Button, Box, Paper, CircularProgress, IconButton, Checkbox, FormControlLabel, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
 import { useDropzone } from 'react-dropzone';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import FileIcon from '@mui/icons-material/InsertDriveFile';
 import CloseIcon from '@mui/icons-material/Close';
+import DownloadIcon from '@mui/icons-material/Download';
+import * as XLSX from 'xlsx';
 
 function Home() {
   const [file, setFile] = useState(null);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [checkedItems, setCheckedItems] = useState({});
+  const [downloadFormat, setDownloadFormat] = useState('json');
 
   const onDrop = useCallback((acceptedFiles) => {
     setFile(acceptedFiles[0]);
@@ -23,6 +27,7 @@ function Home() {
     setFile(null);
     setResult(null);
     setError(null);
+    setCheckedItems({});
   };
 
   const handleSubmit = async () => {
@@ -43,6 +48,11 @@ function Home() {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setResult(response.data);
+      const initialCheckedState = Object.keys(response.data).reduce((acc, key) => {
+        acc[key] = true;
+        return acc;
+      }, {});
+      setCheckedItems(initialCheckedState);
     } catch (error) {
       console.error('Error uploading file:', error);
       setError(error.response?.data?.error || 'Error uploading file');
@@ -54,7 +64,6 @@ function Home() {
   const renderPreview = () => {
     if (!file) return null;
 
-    const fileType = file.type.split('/')[0];
     return (
       <Box sx={{ position: 'relative', mt: 2, textAlign: 'center' }}>
         <IconButton
@@ -63,21 +72,16 @@ function Home() {
         >
           <CloseIcon />
         </IconButton>
-        {fileType === 'image' ? (
-          <img
-            src={URL.createObjectURL(file)}
-            alt="Preview"
-            style={{ maxWidth: '100%', maxHeight: '200px', objectFit: 'contain' }}
-            onLoad={() => URL.revokeObjectURL(file)}
-          />
-        ) : (
-          <Box>
-            <FileIcon sx={{ fontSize: 100, color: 'primary.main' }} />
-            <Typography variant="body1">{file.name}</Typography>
-          </Box>
-        )}
+        <Box>
+          <FileIcon sx={{ fontSize: 100, color: 'primary.main' }} />
+          <Typography variant="body1">{file.name}</Typography>
+        </Box>
       </Box>
     );
+  };
+
+  const handleCheckboxChange = (key) => {
+    setCheckedItems(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   const renderResult = () => {
@@ -93,15 +97,72 @@ function Home() {
         <Paper elevation={3} sx={{ p: 3, backgroundColor: '#f8f8f8' }}>
           {filteredResult.map(([key, value]) => (
             <Box key={key} sx={{ mb: 2 }}>
-              <Typography variant="subtitle1" color="primary" fontWeight="bold">
-                {key.replace(/_/g, ' ').toUpperCase()}:
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={checkedItems[key]}
+                    onChange={() => handleCheckboxChange(key)}
+                  />
+                }
+                label={
+                  <Typography variant="subtitle1" color="primary" fontWeight="bold">
+                    {key.replace(/_/g, ' ').toUpperCase()}:
+                  </Typography>
+                }
+              />
+              <Typography 
+                variant="body1" 
+                sx={{ 
+                  textDecoration: checkedItems[key] ? 'none' : 'line-through',
+                  color: checkedItems[key] ? 'inherit' : 'gray',
+                }}
+              >
+                {value}
               </Typography>
-              <Typography variant="body1">{value}</Typography>
             </Box>
           ))}
         </Paper>
       </Box>
     );
+  };
+
+  const handleDownload = () => {
+    const selectedData = Object.entries(result)
+      .filter(([key]) => checkedItems[key])
+      .reduce((acc, [key, value]) => {
+        acc[key] = value;
+        return acc;
+      }, {});
+
+    if (downloadFormat === 'json') {
+      const blob = new Blob([JSON.stringify(selectedData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'invoice_analysis_result.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } else if (downloadFormat === 'csv') {
+      const csvData = Object.entries(selectedData).map(([key, value]) => ({
+        key: key.replace(/_/g, ' ').toUpperCase(),
+        value
+      }));
+      const worksheet = XLSX.utils.json_to_sheet(csvData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Results');
+      XLSX.writeFile(workbook, 'invoice_analysis_result.csv');
+    } else if (downloadFormat === 'xlsx') {
+      const xlsxData = Object.entries(selectedData).map(([key, value]) => ({
+        key: key.replace(/_/g, ' ').toUpperCase(),
+        value
+      }));
+      const worksheet = XLSX.utils.json_to_sheet(xlsxData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Results');
+      XLSX.writeFile(workbook, 'invoice_analysis_result.xlsx');
+    }
   };
 
   return (
@@ -155,6 +216,32 @@ function Home() {
           </Typography>
         )}
         {renderResult()}
+        {result && (
+          <Box sx={{ mt: 3, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <FormControl sx={{ minWidth: 120, mr: 2 }}>
+              <InputLabel id="format-select-label"></InputLabel>
+              <Select
+                labelId="format-select-label"
+                value={downloadFormat}
+                onChange={(e) => setDownloadFormat(e.target.value)}
+                sx={{ width: 150, bgcolor: 'background.paper', borderRadius: 1 }}
+              >
+                <MenuItem value="json">JSON</MenuItem>
+                <MenuItem value="csv">CSV</MenuItem>
+                <MenuItem value="xlsx">XLSX</MenuItem>
+              </Select>
+            </FormControl>
+            <Button
+              variant="contained"
+              color="secondary"
+              size="large"
+              onClick={handleDownload}
+              startIcon={<DownloadIcon />}
+            >
+              Download Selected Results
+            </Button>
+          </Box>
+        )}
       </Box>
     </Container>
   );
