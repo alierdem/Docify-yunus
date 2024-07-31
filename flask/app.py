@@ -1,20 +1,29 @@
 import os
+import logging
+import re
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from azure.ai.formrecognizer import DocumentAnalysisClient
 from azure.core.credentials import AzureKeyCredential
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
-# Azure Form Recognizer settings
-endpoint = "https://docunalyze-1.cognitiveservices.azure.com/"
-key = "d808277d16234f39adca19e3eb0d6256"
+# Azure Form Recognizer settings from environment variables
+endpoint = os.getenv("AZURE_FORM_RECOGNIZER_ENDPOINT")
+key = os.getenv("AZURE_FORM_RECOGNIZER_KEY")
 
 # Ensure a directory for uploads exists
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
+
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 @app.route('/api/upload', methods=['POST'])
 def upload_file():
@@ -39,9 +48,16 @@ def analyze_invoice(file_path):
         invoice = result.documents[0].fields
         invoice_data = {}
         for field_name, field_value in invoice.items():
-            invoice_data[field_name] = field_value.content if field_value else None
+            # Convert camelCase to Title Case
+            human_readable_field_name = re.sub(r'(?<!^)(?=[A-Z])', ' ', field_name).title()
+            invoice_data[human_readable_field_name] = field_value.content if field_value else None
+        
+        # Log the invoice data
+        logging.info(f"Extracted invoice data: {invoice_data}")
+        
         return invoice_data
     else:
+        logging.error('No invoice found in the document')
         return {'error': 'No invoice found in the document'}
 
 if __name__ == '__main__':
