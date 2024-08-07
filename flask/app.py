@@ -1,7 +1,7 @@
 import os
 import logging
 import re
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory, Blueprint
 from flask_cors import CORS
 from azure.ai.formrecognizer import DocumentAnalysisClient
 from azure.core.credentials import AzureKeyCredential
@@ -25,7 +25,20 @@ if not os.path.exists(UPLOAD_FOLDER):
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-@app.route('/api/upload', methods=['POST'])
+app = Flask(__name__, static_folder='../invoice-reader/build')
+
+frontend = Blueprint('frontend', __name__)
+backend = Blueprint('backend', __name__)
+
+@backend.route('/health-backend', methods=['GET'])
+def health_check():
+    return 'OK'
+
+@frontend.route('/health-frontend', methods=['GET'])
+def health_check_frontend():
+    return 'OK'
+
+@backend.route('/api/upload', methods=['POST'])
 def upload_file():
     if 'file' not in request.files:
         return jsonify({'error': 'No file part'}), 400
@@ -37,6 +50,15 @@ def upload_file():
         file.save(filename)
         result = analyze_invoice(filename)
         return jsonify(result), 200
+
+
+@frontend.route('/', defaults={'path': ''})
+@frontend.route('/<path:path>')
+def serve(path):
+    if path != "" and os.path.exists(app.static_folder + '/' + path):
+        return send_from_directory(app.static_folder, path)
+    else:
+        return send_from_directory(app.static_folder, 'index.html')
     
 def analyze_invoice(file_path):
     client = DocumentAnalysisClient(endpoint, AzureKeyCredential(key))
@@ -92,7 +114,7 @@ def analyze_invoice_for_field(file_path, field):
         logging.warning(f'Field "{field}" not found in the document')
         return {'result': {}, 'found': False, 'message': f'Field "{field}" not found in the document'}
 
-@app.route('/api/search_additional_field', methods=['POST'])
+@backend.route('/api/search_additional_field', methods=['POST'])
 def search_additional_field():
     data = request.json
     file_path = os.path.join(UPLOAD_FOLDER, data['file_path'])
@@ -104,6 +126,8 @@ def search_additional_field():
     result = analyze_invoice_for_field(file_path, field)
     return jsonify(result), 200
 
-   
+app.register_blueprint(backend)
+app.register_blueprint(frontend)
+
 if __name__ == '__main__':
     app.run(debug=True)

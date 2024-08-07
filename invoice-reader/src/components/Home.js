@@ -62,7 +62,7 @@ function Home() {
 
     try {
       const response = await axios.post(
-        "http://localhost:5001/api/upload",
+        "http://localhost:8080/api/upload",
         formData,
         {
           headers: { "Content-Type": "multipart/form-data" },
@@ -123,7 +123,7 @@ function Home() {
 
     try {
       const response = await axios.post(
-        "http://localhost:5001/api/search_additional_field",
+        "http://localhost:8080/api/search_additional_field",
         {
           file_path: file.name,
           field: additionalField,
